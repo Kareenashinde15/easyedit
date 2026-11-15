@@ -25,7 +25,25 @@ from urllib.parse import unquote, urlparse
 from . import doctor
 from .util import JOBS, ROOT, final_output, probe, read_json, slugify
 
-PORT = int(os.environ.get("EASYEDIT_PORT", "4331"))
+def get_port() -> int:
+    """Return the configured web UI port or exit with an actionable message."""
+    value = os.environ.get("EASYEDIT_PORT", "4331")
+
+    try:
+        port = int(value)
+    except ValueError:
+        raise SystemExit(
+            f"invalid EASYEDIT_PORT value {value!r}; "
+            "set EASYEDIT_PORT to a valid port number (1-65535)"
+        ) from None
+
+    if not 1 <= port <= 65535:
+        raise SystemExit(
+            f"invalid EASYEDIT_PORT value {value!r}; "
+            "set EASYEDIT_PORT to a valid port number (1-65535)"
+        )
+
+    return port
 WEB = Path(__file__).parent / "web"
 _SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 mimetypes.add_type("image/svg+xml", ".svg")  # missing from the Windows registry on some machines
@@ -548,8 +566,18 @@ class Handler(BaseHTTPRequestHandler):
 def main() -> None:
     if not (WEB / "index.html").exists():
         raise SystemExit(f"missing {WEB / 'index.html'}")
-    server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
-    url = f"http://127.0.0.1:{PORT}"
+    port = get_port()
+
+    try:
+        server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    except OSError as e:
+        raise SystemExit(
+            f"cannot start easyedit web UI on port {port}: {e}. "
+            "Choose another port by setting EASYEDIT_PORT."
+            "PowerShell: $env:EASYEDIT_PORT='4332'"
+        ) from None
+
+    url = f"http://127.0.0.1:{port}"
     print(f"easyedit web: {url}", flush=True)
     setup_report()
     if "--no-browser" not in sys.argv:

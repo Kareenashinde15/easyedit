@@ -3,6 +3,7 @@ import json
 import signal
 import subprocess
 import tempfile
+import os
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -536,6 +537,39 @@ class StartJobSessionTest(unittest.TestCase):
 
         stop.assert_called_once_with("test-slug")
 
+class WebPortTest(unittest.TestCase):
+    def test_main_reports_when_port_is_busy(self):
+        busy_error = OSError("Address already in use")
+
+        with mock.patch.object(web, "get_port", return_value=4331), \
+            mock.patch.object(web, "ThreadingHTTPServer", side_effect=busy_error), \
+            self.assertRaises(SystemExit) as error:
+            web.main()
+
+        self.assertIn("4331", str(error.exception))
+        self.assertIn("EASYEDIT_PORT", str(error.exception))
+
+    def test_get_port_returns_default_port(self):
+        with mock.patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(web.get_port(), 4331)
+
+    def test_get_port_accepts_valid_port(self):
+        with mock.patch.dict(os.environ, {"EASYEDIT_PORT": "5000"}):
+            self.assertEqual(web.get_port(), 5000)
+
+    def test_get_port_rejects_non_numeric_value(self):
+        with mock.patch.dict(os.environ, {"EASYEDIT_PORT": "hello"}):
+            with self.assertRaises(SystemExit) as error:
+                web.get_port()
+
+        self.assertIn("EASYEDIT_PORT", str(error.exception))
+
+    def test_get_port_rejects_out_of_range_values(self):
+        for value in ("0", "65536"):
+            with self.subTest(value=value):
+                with mock.patch.dict(os.environ, {"EASYEDIT_PORT": value}):
+                    with self.assertRaises(SystemExit):
+                        web.get_port()
 
 if __name__ == "__main__":
     unittest.main()

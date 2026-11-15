@@ -43,7 +43,7 @@ def get_port() -> int:
             "set EASYEDIT_PORT to a valid port number (1-65535)"
         )
 
-        return port
+    return port
 
 
 WEB = Path(__file__).parent / "web"

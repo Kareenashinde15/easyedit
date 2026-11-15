@@ -43,7 +43,9 @@ def get_port() -> int:
             "set EASYEDIT_PORT to a valid port number (1-65535)"
         )
 
-    return port
+        return port
+
+
 WEB = Path(__file__).parent / "web"
 _SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 mimetypes.add_type("image/svg+xml", ".svg")  # missing from the Windows registry on some machines
@@ -573,8 +575,8 @@ def main() -> None:
     except OSError as e:
         raise SystemExit(
             f"cannot start easyedit web UI on port {port}: {e}. "
-            "Choose another port by setting EASYEDIT_PORT."
-            "PowerShell: $env:EASYEDIT_PORT='4332'"
+            "Choose another port by setting EASYEDIT_PORT "
+            "(PowerShell: $env:EASYEDIT_PORT='4332')."
         ) from None
 
     url = f"http://127.0.0.1:{port}"

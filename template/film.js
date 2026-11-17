@@ -215,26 +215,118 @@
   }
 
   // ---------- title card on the hero shot ----------
-  function titleCard(t) {
-    const hero = E.shots[E.shots.length - 1];
-    const start = hero.start / FPS + 0.55;
-    if (t < start) return;
-    const q = outExpo((t - start) / 0.9);
-    const fade = 1 - inOut((t - (END - 0.7)) / 0.45);
-    ctx.save();
-    ctx.translate(W / 2, H * 0.5);
-    ctx.globalAlpha = q * fade;
-    if (q < 0.99) ctx.filter = `blur(${((1 - q) * 10).toFixed(2)}px)`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#ffffff';
-    ctx.shadowColor = 'rgba(0,0,0,0.6)';
-    ctx.shadowBlur = 20;
-    ctx.font = '96px EEDisplay';
-    ctx.letterSpacing = `${(26 - 12 * q).toFixed(1)}px`;
-    ctx.fillText(E.title.toUpperCase(), 0, 0);
-    ctx.restore();
+
+function titleCard(t) {
+  const hero = E.shots[E.shots.length - 1];
+  const start = hero.start / FPS + 0.55;
+  if (t < start) return;
+
+  const q = outExpo((t - start) / 0.9);
+  const fade = 1 - inOut((t - (END - 0.7)) / 0.45);
+
+  ctx.save();
+  ctx.translate(W / 2, H * 0.5);
+  ctx.globalAlpha = q * fade;
+
+  if (q < 0.99) {
+    ctx.filter = `blur(${((1 - q) * 10).toFixed(2)}px)`;
   }
+
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#ffffff';
+  ctx.shadowColor = 'rgba(0,0,0,0.6)';
+  ctx.shadowBlur = 20;
+
+  const title = E.title.toUpperCase();
+  const maxWidth = W * 0.9;
+  const maxSpacing = 26;
+  let fontSize = 96;
+
+  // Measure text without letter spacing, then account for spacing.
+  const measureTitle = (text) => {
+    ctx.letterSpacing = '0px';
+
+    const width = ctx.measureText(text).width;
+    const characters = Array.from(text).length;
+
+    return width + Math.max(0, characters - 1) * maxSpacing;
+  };
+
+    ctx.font = `${fontSize}px EEDisplay`;
+
+  // Reduce font size only if an individual word is too wide.
+  const minFontSize = 32;
+  const words = title.trim().split(/\s+/);
+
+  let widestWord = Math.max(...words.map(measureTitle));
+
+  while (widestWord > maxWidth && fontSize > minFontSize) {
+    fontSize = Math.max(minFontSize, fontSize - 2);
+    ctx.font = `${fontSize}px EEDisplay`;
+    widestWord = Math.max(...words.map(measureTitle));
+  }
+
+
+  // Split exceptionally long individual words into smaller chunks.
+  const splitLongWord = (word) => {
+    const chunks = [];
+    let chunk = '';
+
+    for (const character of Array.from(word)) {
+      const candidate = chunk + character;
+
+      if (chunk && measureTitle(candidate) > maxWidth) {
+        chunks.push(chunk);
+        chunk = character;
+      } else {
+        chunk = candidate;
+      }
+    }
+
+    if (chunk) chunks.push(chunk);
+
+    return chunks;
+  };
+
+  // Wrap the title while keeping complete words together when possible.
+  const lines = [];
+  let line = '';
+
+  for (const word of title.trim().split(/\s+/)) {
+    const candidate = line ? `${line} ${word}` : word;
+
+    if (measureTitle(candidate) <= maxWidth) {
+      line = candidate;
+      continue;
+    }
+
+    if (line) {
+      lines.push(line);
+      line = '';
+    }
+
+    const chunks = splitLongWord(word);
+
+    lines.push(...chunks.slice(0, -1));
+    line = chunks[chunks.length - 1] || '';
+  }
+
+  if (line) lines.push(line);
+
+  // Preserve the original letter-spacing animation.
+  ctx.font = `${fontSize}px EEDisplay`;
+  ctx.letterSpacing = `${(26 - 12 * q).toFixed(1)}px`;
+
+  const lineHeight = fontSize * 1.15;
+
+  lines.forEach((text, index) => {
+    const y = (index - (lines.length - 1) / 2) * lineHeight;
+    ctx.fillText(text, 0, y);
+  });
+
+  ctx.restore();
+}
 
   // ---------- film grain (seeded per frame so split renders match) ----------
   const grainTiles = [];

@@ -215,118 +215,129 @@
   }
 
   // ---------- title card on the hero shot ----------
+  function titleCard(t) {
+    const hero = E.shots[E.shots.length - 1];
+    const start = hero.start / FPS + 0.55;
+    if (t < start) return;
 
-function titleCard(t) {
-  const hero = E.shots[E.shots.length - 1];
-  const start = hero.start / FPS + 0.55;
-  if (t < start) return;
+    const q = outExpo((t - start) / 0.9);
+    const fade = 1 - inOut((t - (END - 0.7)) / 0.45);
 
-  const q = outExpo((t - start) / 0.9);
-  const fade = 1 - inOut((t - (END - 0.7)) / 0.45);
+    ctx.save();
+    ctx.translate(W / 2, H * 0.5);
+    ctx.globalAlpha = q * fade;
 
-  ctx.save();
-  ctx.translate(W / 2, H * 0.5);
-  ctx.globalAlpha = q * fade;
+    if (q < 0.99) {
+      ctx.filter = `blur(${((1 - q) * 10).toFixed(2)}px)`;
+    }
 
-  if (q < 0.99) {
-    ctx.filter = `blur(${((1 - q) * 10).toFixed(2)}px)`;
-  }
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowColor = 'rgba(0,0,0,0.6)';
+    ctx.shadowBlur = 20;
 
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#ffffff';
-  ctx.shadowColor = 'rgba(0,0,0,0.6)';
-  ctx.shadowBlur = 20;
+    const title = String(E.title || '').trim().toUpperCase();
+    if (!title) {
+      ctx.restore();
+      return;
+    }
 
-  const title = E.title.toUpperCase();
-  const maxWidth = W * 0.9;
-  const maxSpacing = 26;
-  let fontSize = 96;
+    const maxWidth = W * 0.9;
+    const maxHeight = H * 0.65;
+    const maxSpacing = 26;
+    const minFontSize = 32;
+    let fontSize = 96;
+    let lines = [];
 
-  // Measure text without letter spacing, then account for spacing.
-  const measureTitle = (text) => {
-    ctx.letterSpacing = '0px';
+    const measureTitle = text => ctx.measureText(text).width;
 
-    const width = ctx.measureText(text).width;
-    const characters = Array.from(text).length;
+    const wrapTitle = () => {
+      ctx.font = `${fontSize}px EEDisplay`;
+      ctx.letterSpacing = `${maxSpacing}px`;
 
-    return width + Math.max(0, characters - 1) * maxSpacing;
-  };
+      const result = [];
+      let line = '';
 
-    ctx.font = `${fontSize}px EEDisplay`;
+      const splitLongWord = word => {
+        const chunks = [];
+        let chunk = '';
 
-  // Reduce font size only if an individual word is too wide.
-  const minFontSize = 32;
-  const words = title.trim().split(/\s+/);
+        for (const character of Array.from(word)) {
+          const candidate = chunk + character;
 
-  let widestWord = Math.max(...words.map(measureTitle));
+          if (chunk && measureTitle(candidate) > maxWidth) {
+            chunks.push(chunk);
+            chunk = character;
+          } else {
+            chunk = candidate;
+          }
+        }
 
-  while (widestWord > maxWidth && fontSize > minFontSize) {
-    fontSize = Math.max(minFontSize, fontSize - 2);
-    ctx.font = `${fontSize}px EEDisplay`;
-    widestWord = Math.max(...words.map(measureTitle));
-  }
+        if (chunk) chunks.push(chunk);
+        return chunks;
+      };
 
+      for (const word of title.split(/\s+/)) {
+        const candidate = line ? `${line} ${word}` : word;
 
-  // Split exceptionally long individual words into smaller chunks.
-  const splitLongWord = (word) => {
-    const chunks = [];
-    let chunk = '';
+        if (measureTitle(candidate) <= maxWidth) {
+          line = candidate;
+          continue;
+        }
 
-    for (const character of Array.from(word)) {
-      const candidate = chunk + character;
+        if (line) {
+          result.push(line);
+          line = '';
+        }
 
-      if (chunk && measureTitle(candidate) > maxWidth) {
-        chunks.push(chunk);
-        chunk = character;
-      } else {
-        chunk = candidate;
+        const chunks = splitLongWord(word);
+        result.push(...chunks.slice(0, -1));
+        line = chunks[chunks.length - 1] || '';
       }
+
+      if (line) result.push(line);
+      return result;
+    };
+
+    while (true) {
+      lines = wrapTitle();
+
+      const lineHeight = fontSize * 1.15;
+      const totalHeight = lines.length * lineHeight;
+      const widestLine = Math.max(
+        0,
+        ...lines.map(measureTitle)
+      );
+
+      if (
+        (widestLine <= maxWidth && totalHeight <= maxHeight) ||
+        fontSize <= minFontSize
+      ) {
+        break;
+      }
+
+            fontSize = Math.max(minFontSize, fontSize - 2);
     }
 
-    if (chunk) chunks.push(chunk);
+    // Ensure even unusually long titles fit vertically.
+    fontSize = Math.min(
+      fontSize,
+      maxHeight / (lines.length * 1.15)
+    );
 
-    return chunks;
-  };
+    ctx.font = `${fontSize}px EEDisplay`;
+    ctx.letterSpacing = `${(26 - 12 * q).toFixed(1)}px`;
 
-  // Wrap the title while keeping complete words together when possible.
-  const lines = [];
-  let line = '';
+    const lineHeight = fontSize * 1.15;
 
-  for (const word of title.trim().split(/\s+/)) {
-    const candidate = line ? `${line} ${word}` : word;
+    lines.forEach((text, index) => {
+      const y = (index - (lines.length - 1) / 2) * lineHeight;
+      ctx.fillText(text, 0, y);
+    });
 
-    if (measureTitle(candidate) <= maxWidth) {
-      line = candidate;
-      continue;
-    }
-
-    if (line) {
-      lines.push(line);
-      line = '';
-    }
-
-    const chunks = splitLongWord(word);
-
-    lines.push(...chunks.slice(0, -1));
-    line = chunks[chunks.length - 1] || '';
+    ctx.restore();
   }
-
-  if (line) lines.push(line);
-
-  // Preserve the original letter-spacing animation.
-  ctx.font = `${fontSize}px EEDisplay`;
-  ctx.letterSpacing = `${(26 - 12 * q).toFixed(1)}px`;
-
-  const lineHeight = fontSize * 1.15;
-
-  lines.forEach((text, index) => {
-    const y = (index - (lines.length - 1) / 2) * lineHeight;
-    ctx.fillText(text, 0, y);
-  });
-
-  ctx.restore();
-}
 
   // ---------- film grain (seeded per frame so split renders match) ----------
   const grainTiles = [];
